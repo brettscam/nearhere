@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Narration } from "@/lib/types";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-sonnet-5";
 
 interface NarrateBody {
   lat: number;
@@ -69,13 +70,33 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
-    const raw: string = data?.content?.[0]?.text ?? "";
-    const jsonText = raw.replace(/```json\s*|\s*```/g, "").trim();
+    // Newer models can prepend a "thinking" block, so select the text block
+    // rather than assuming content[0].
+    const raw: string =
+      (data?.content ?? []).find((c: { type?: string }) => c?.type === "text")?.text ?? "";
+    // Pull the JSON object out even if the model wraps it in prose or fences.
+    const jsonText = extractJson(raw);
+    if (!jsonText) {
+      return NextResponse.json(
+        { narration: fallbackNarration(body), source: "fallback", note: "empty model response" },
+        { status: 200 },
+      );
+    }
     const parsed = JSON.parse(jsonText) as Narration;
     return NextResponse.json({ narration: parsed, source: "claude" });
   } catch (e: any) {
     return NextResponse.json({ error: String(e).slice(0, 200) }, { status: 500 });
   }
+}
+
+/** Extract the first balanced JSON object from a model response. */
+function extractJson(raw: string): string | null {
+  const cleaned = raw.replace(/```json\s*|\s*```/g, "").trim();
+  if (!cleaned) return null;
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end === -1 || end < start) return null;
+  return cleaned.slice(start, end + 1);
 }
 
 /** A believable placeholder when no API key is configured. */

@@ -88,7 +88,7 @@ NearhereTests/            Unit tests (adaptive radius, throttling)
    alerts (1 per 3 min highway, 1 per 90 s urban) with a 10-mile per-POI cooldown.
 3. **`GeoLookupService`** — reverse-geocodes (CLGeocoder) and pulls nearby features from
    the Overpass API (OpenStreetMap), tile-cached by geohash for offline use.
-4. **`NarrationService`** — calls the Anthropic Claude API (`claude-sonnet-4-6`) to write
+4. **`NarrationService`** — calls the Anthropic Claude API (`claude-sonnet-5`) to write
    warm, conversational narration; caches by ~100 m coordinate hash so the same spot is
    never regenerated. Degrades gracefully offline (cache → skip silently).
 5. **`TTSService`** — speaks narration via `AVSpeechSynthesizer`, ducking music/podcasts

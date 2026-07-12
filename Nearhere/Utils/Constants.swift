@@ -47,7 +47,7 @@ enum Constants {
     enum API {
         static let anthropicBaseURL = "https://api.anthropic.com/v1/messages"
         static let anthropicVersion = "2023-06-01"
-        static let narrationModel = "claude-sonnet-4-6"
+        static let narrationModel = "claude-sonnet-5"
         static let maxTokens = 1024
     }
 
