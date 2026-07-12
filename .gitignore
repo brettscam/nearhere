@@ -1,0 +1,43 @@
+# Xcode
+build/
+DerivedData/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/xcuserdata/
+xcuserdata/
+*.xcuserstate
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.perspectivev3
+!default.perspectivev3
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# XcodeGen generates the project; keep the spec, ignore the output
+Nearhere.xcodeproj/
+
+# CocoaPods / Carthage (unused, defensive)
+Pods/
+Carthage/Build/
+
+# Secrets — NEVER commit real API keys
+Secrets.plist
+Nearhere/Config/Secrets.plist
+*.env
+.env
+.env.local
+
+# macOS
+.DS_Store
+*.swp
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Nearhere</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+
+	<!-- Location permissions: user-facing purpose strings about proximity detection -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Nearhere uses your location to detect interesting places, history, and landmarks near you as you travel.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Nearhere monitors your location in the background so it can surface nearby stories and points of interest while you drive — even with the screen off.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Nearhere monitors your location in the background so it can surface nearby stories and points of interest while you drive.</string>
+
+	<!-- Microphone for voice commands ("tell me more", etc.) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Nearhere uses the microphone so you can ask for more about a place using your voice, hands-free while driving.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Nearhere uses speech recognition to understand hands-free voice commands while you drive.</string>
+
+	<!-- Background modes: keep location + audio alive while backgrounded -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>audio</string>
+	</array>
+
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+		<string>location-services</string>
+		<string>gps</string>
+	</array>
+</dict>
+</plist>
