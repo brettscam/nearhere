@@ -42,6 +42,15 @@
 		<string>audio</string>
 	</array>
 
+	<!-- Bundled brand fonts (OFL) — see Resources/Fonts -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>Newsreader.ttf</string>
+		<string>HankenGrotesk.ttf</string>
+		<string>SpaceMono-Regular.ttf</string>
+		<string>SpaceMono-Bold.ttf</string>
+	</array>
+
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

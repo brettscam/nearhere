@@ -2,10 +2,11 @@ import SwiftUI
 import CoreLocation
 
 /// The floating alert card shown when a nearby POI is surfaced. Slides up from
-/// the bottom, shows category / name / distance, an audio progress bar, and a
-/// large "Tell Me More" CTA. Swipe down to dismiss.
+/// the bottom, shows category / name / distance, an ember audio bar, and a large
+/// "Tell me more" CTA. Swipe down to dismiss.
 ///
-/// Placeholder/scaffold styling using `DesignTokens`; refine once comps land.
+/// Styled to Design System v1.0: mono eyebrow in the category tint, a glanceable
+/// Hanken headline, Space Mono metadata, ember progress, amber CTA.
 struct POICardView: View {
 
     let poi: POI
@@ -19,16 +20,20 @@ struct POICardView: View {
     /// Travel heading (deg clockwise from north) used for the direction phrase.
     var heading: CLLocationDirection = 0
 
+    /// Whether this story is bookmarked (renders the gold "claimed" flag).
+    var isBookmarked: Bool = false
+
     var onTellMeMore: () -> Void = {}
     var onDismiss: () -> Void = {}
+    var onBookmark: () -> Void = {}
 
-    /// Internal expansion state; expands the card once "Tell Me More" is tapped.
+    /// Internal expansion state; expands the card once "Tell me more" is tapped.
     @State private var isExpanded: Bool = false
 
     /// Live drag offset for the swipe-to-dismiss gesture.
     @State private var dragOffset: CGFloat = 0
 
-    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 22
+    @ScaledMetric(relativeTo: .title) private var iconChip: CGFloat = 34
 
     /// Distance the card must be dragged down before it dismisses.
     private let dismissThreshold: CGFloat = 90
@@ -42,7 +47,8 @@ struct POICardView: View {
 
             if isExpanded, let hook = poi.narration?.followUpHook, !hook.isEmpty {
                 Text(hook)
-                    .font(DesignTokens.Typography.body(15))
+                    .font(DesignTokens.Typography.serifBody(18))
+                    .italic()
                     .foregroundStyle(DesignTokens.Palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -50,9 +56,10 @@ struct POICardView: View {
 
             tellMeMoreButton
         }
-        .padding(DesignTokens.Spacing.lg)
+        .padding(DesignTokens.Spacing.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle(fill: DesignTokens.Palette.surfaceRaised)
+        .overlay(alignment: .topTrailing) { bookmarkButton }
+        .cardStyle(fill: DesignTokens.Palette.surface)
         .padding(.horizontal, DesignTokens.Spacing.md)
         .offset(y: max(dragOffset, 0))
         .gesture(dismissDrag)
@@ -65,41 +72,49 @@ struct POICardView: View {
 
     private var grabber: some View {
         Capsule()
-            .fill(DesignTokens.Palette.textTertiary.opacity(0.6))
+            .fill(DesignTokens.Palette.textTertiary.opacity(0.5))
             .frame(width: 40, height: 5)
             .frame(maxWidth: .infinity)
             .accessibilityHidden(true)
     }
 
     private var categoryRow: some View {
-        HStack(spacing: DesignTokens.Spacing.sm) {
-            Image(systemName: poi.category.symbolName)
-                .font(.system(size: iconSize, weight: .semibold))
-                .foregroundStyle(DesignTokens.Palette.accent)
+        HStack(spacing: DesignTokens.Spacing.rowGap) {
+            // Washed icon chip in the category tint.
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(poi.category.washColor)
+                .frame(width: iconChip, height: iconChip)
+                .overlay(
+                    Image(systemName: poi.category.symbolName)
+                        .font(.system(size: iconChip * 0.55, weight: .regular))
+                        .foregroundStyle(poi.category.tintColor)
+                )
                 .accessibilityHidden(true)
 
-            Text(poi.category.displayName.uppercased())
-                .font(DesignTokens.Typography.caption(13))
-                .tracking(1.2)
-                .foregroundStyle(DesignTokens.Palette.accent)
+            Text(poi.category.displayName)
+                .font(DesignTokens.Typography.eyebrow)
+                .tracking(2.0)
+                .textCase(.uppercase)
+                .foregroundStyle(poi.category.tintColor)
 
             Spacer(minLength: 0)
 
             Text(poi.era.displayName)
-                .font(DesignTokens.Typography.caption(12))
+                .font(DesignTokens.Typography.monoMeta(12))
                 .foregroundStyle(DesignTokens.Palette.textTertiary)
         }
     }
 
     private var nameAndDistance: some View {
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
             Text(poi.name)
-                .font(DesignTokens.Typography.title(26))
+                .font(DesignTokens.Typography.cardHeadline)
                 .foregroundStyle(DesignTokens.Palette.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(distanceDirectionText)
-                .font(DesignTokens.Typography.body(16))
+                .font(DesignTokens.Typography.monoMeta(14))
+                .tracking(0.4)
                 .foregroundStyle(DesignTokens.Palette.textSecondary)
         }
     }
@@ -110,11 +125,11 @@ struct POICardView: View {
                 Capsule()
                     .fill(DesignTokens.Palette.hairline)
                 Capsule()
-                    .fill(DesignTokens.Palette.accent)
+                    .fill(DesignTokens.Palette.active) // ember — live audio
                     .frame(width: geo.size.width * clampedProgress)
             }
         }
-        .frame(height: 6)
+        .frame(height: 5)
         .animation(.linear(duration: 0.2), value: clampedProgress)
         .accessibilityLabel("Narration progress")
         .accessibilityValue("\(Int(clampedProgress * 100)) percent")
@@ -130,10 +145,10 @@ struct POICardView: View {
             HStack(spacing: DesignTokens.Spacing.sm) {
                 Image(systemName: isExpanded ? "waveform" : "text.bubble.fill")
                     .symbolEffect(.variableColor, isActive: isExpanded)
-                Text(isExpanded ? "Playing…" : "Tell Me More")
+                Text(isExpanded ? "Playing…" : "Tell me more")
             }
-            .font(DesignTokens.Typography.heading(18))
-            .foregroundStyle(DesignTokens.Palette.background)
+            .font(.custom(DesignTokens.Typography.sans, size: 17, relativeTo: .headline).weight(.bold))
+            .foregroundStyle(DesignTokens.Palette.onAccent)
             .frame(maxWidth: .infinity)
             .frame(height: DesignTokens.Size.primaryButtonHeight)
             .background(
@@ -145,6 +160,19 @@ struct POICardView: View {
         .disabled(isExpanded)
         .opacity(isExpanded ? 0.85 : 1)
         .accessibilityHint(isExpanded ? "Narration playing" : "Plays a longer story about this place")
+    }
+
+    private var bookmarkButton: some View {
+        Button(action: onBookmark) {
+            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(isBookmarked ? DesignTokens.Palette.highlight : DesignTokens.Palette.textTertiary)
+                .frame(width: DesignTokens.Size.minTapTarget, height: DesignTokens.Size.minTapTarget)
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, DesignTokens.Spacing.sm)
+        .padding(.top, DesignTokens.Spacing.sm)
+        .accessibilityLabel(isBookmarked ? "Remove bookmark" : "Bookmark this story")
     }
 
     // MARK: - Gestures
@@ -172,10 +200,9 @@ struct POICardView: View {
         if let location = userLocation {
             let dist = poi.distance(from: location).milesString
             let dir = poi.direction(from: location, heading: heading)
-            return "\(dist) · \(dir)"
+            return "\(dist) · \(dir)".uppercased()
         }
-        // Placeholder when we don't yet have a fix.
-        return "1.2 mi ahead"
+        return "1.2 MI AHEAD"
     }
 }
 
@@ -183,16 +210,16 @@ struct POICardView: View {
 
 #Preview("POI Card") {
     let poi = POI(
-        name: "Devil's Tower",
-        coordinate: CLLocationCoordinate2D(latitude: 44.5902, longitude: -104.7146),
+        name: "Mono Lake Tufa",
+        coordinate: CLLocationCoordinate2D(latitude: 38.0169, longitude: -119.0269),
         category: .geology,
         era: .prehistoric,
         narration: NarrationContent(
-            title: "Devil's Tower",
+            title: "Mono Lake Tufa",
             category: .geology,
             era: .prehistoric,
-            narration: "Rising 867 feet above the plains, this igneous monolith formed underground some 50 million years ago.",
-            followUpHook: "Want to hear how the Lakota people tell its origin?",
+            narration: "These calcium-carbonate spires grew underwater over centuries.",
+            followUpHook: "Want to hear how a thirsty city three hundred miles south drained the lake?",
             type: .alert
         )
     )
@@ -201,12 +228,7 @@ struct POICardView: View {
         DesignTokens.Palette.background.ignoresSafeArea()
         VStack {
             Spacer()
-            POICardView(
-                poi: poi,
-                progress: 0.4,
-                onTellMeMore: {},
-                onDismiss: {}
-            )
+            POICardView(poi: poi, progress: 0.42, isBookmarked: true)
         }
     }
     .preferredColorScheme(.dark)

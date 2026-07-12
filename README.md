@@ -97,9 +97,28 @@ xcodebuild test -scheme Nearhere -destination 'platform=iOS Simulator,name=iPhon
 Unit tests cover the adaptive-radius calculation and alert-throttling logic in
 `ProximityEngine`.
 
+## Design system
+
+Design System v1.0 ("contour lines and campfire light") is implemented in
+`Utils/DesignTokens.swift`:
+
+- **Palette** — warm basalt/sand neutrals (adaptive light & dark, dark is primary),
+  Trailhead Amber as the single signal, Ember reserved for live audio, Prospect Gold
+  for discovery/claimed. Ten semantic category colors live on `POICategory.tintColor`.
+- **Typography** — three bundled OFL faces: Newsreader (stories), Hanken Grotesk
+  (interface), Space Mono (numbers/coordinates). See `Resources/Fonts/README.md`.
+- **Motion** — the breathing proximity rings are the app's loading vocabulary
+  (no spinners). `Views/ProximityMark.swift` implements the three states:
+  `listening`, `narrating`, `digging`.
+- **App icon** — Direction A · Proximity Pulse (radar rings + amber core), rendered
+  to `Assets.xcassets/AppIcon.appiconset`. The designer's full 1024 set can drop in
+  over it.
+
 ## Roadmap notes
 
 - Voice command intent handling (Speech framework) — permission strings are in place.
 - Trip Mode route pre-scan + offline audio caching (`TripModeService`).
-- Replace `DesignTokens` placeholder palette/typography with final Claude design comps.
+- Wire `TTSService` into the alert flow (feed live narration progress into `POICardView`
+  and switch `ProximityMark` to `.narrating`).
+- Custom contour-line category icon set (currently SF Symbols stand in).
 - Move narration generation behind the Vercel proxy before any public release.

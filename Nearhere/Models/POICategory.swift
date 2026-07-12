@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// The subject/domain of a point of interest. Drives iconography and filtering.
 enum POICategory: String, Codable, CaseIterable, Identifiable, Hashable {
@@ -31,7 +32,34 @@ enum POICategory: String, Codable, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// Semantic base color per topic (Design System §02). Used at full strength
+    /// on light surfaces; `tintColor` lifts it for legibility on dark.
+    var baseColor: Color {
+        switch self {
+        case .geology:      return Color(hex: 0xA6552F)
+        case .history:      return Color(hex: 0x8A6D3B)
+        case .indigenous:   return Color(hex: 0xC1922F)
+        case .ecology:      return Color(hex: 0x5C7A3F)
+        case .architecture: return Color(hex: 0x4E6172)
+        case .folklore:     return Color(hex: 0x7A5468)
+        case .industry:     return Color(hex: 0x5E6B6E)
+        case .military:     return Color(hex: 0x6E6B3E)
+        case .culture:      return Color(hex: 0xA05046)
+        case .astronomy:    return Color(hex: 0x3B4A73)
+        }
+    }
+
+    /// Adaptive tint: base on light, a lifted variant on dark so eyebrows and
+    /// icons stay legible on basalt surfaces.
+    var tintColor: Color {
+        Color(light: baseColor, dark: baseColor.lightened(by: 0.30))
+    }
+
+    /// A soft wash of the category color for icon backgrounds.
+    var washColor: Color { tintColor.opacity(0.16) }
+
     /// SF Symbol name mapped to the category, used by `POICardView`.
+    /// (Placeholder for the custom contour-line icon set in the design system.)
     var symbolName: String {
         switch self {
         case .geology:      return "mountain.2.fill"

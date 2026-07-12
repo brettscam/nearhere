@@ -12,9 +12,6 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var showTrip = false
 
-    /// Drives the repeating pulse animation of the proximity rings.
-    @State private var pulse = false
-
     var body: some View {
         ZStack {
             background
@@ -22,7 +19,7 @@ struct HomeView: View {
             VStack(spacing: DesignTokens.Spacing.xl) {
                 topBar
                 Spacer()
-                pulsingRing
+                proximityMark
                 statusBlock
                 Spacer()
                 monitorControl
@@ -48,7 +45,6 @@ struct HomeView: View {
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: proximityEngine.activeAlert)
-        .onAppear { pulse = true }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showTrip) { TripModeView() }
     }
@@ -82,10 +78,12 @@ struct HomeView: View {
         HStack(spacing: DesignTokens.Spacing.md) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("You're near")
-                    .font(DesignTokens.Typography.caption(12))
+                    .font(DesignTokens.Typography.eyebrow)
+                    .tracking(2.4)
+                    .textCase(.uppercase)
                     .foregroundStyle(DesignTokens.Palette.textTertiary)
                 Text(appState.currentRegionName ?? "Locating…")
-                    .font(DesignTokens.Typography.heading(20))
+                    .font(DesignTokens.Typography.titleStyle)
                     .foregroundStyle(DesignTokens.Palette.textPrimary)
             }
 
@@ -109,36 +107,19 @@ struct HomeView: View {
         .accessibilityLabel(label)
     }
 
-    // MARK: - Pulsing ring
+    // MARK: - Proximity mark (the breathing rings)
 
-    private var pulsingRing: some View {
-        ZStack {
-            ForEach(0..<3) { index in
-                Circle()
-                    .stroke(DesignTokens.Palette.accent.opacity(0.5), lineWidth: 2)
-                    .frame(width: 120, height: 120)
-                    .scaleEffect(pulse ? 2.4 : 1.0)
-                    .opacity(pulse ? 0.0 : 0.6)
-                    .animation(
-                        .easeOut(duration: 3)
-                        .repeatForever(autoreverses: false)
-                        .delay(Double(index)),
-                        value: pulse
-                    )
-            }
+    private var proximityMark: some View {
+        ProximityMark(state: markState, size: 220)
+            .frame(height: 300)
+            .opacity(appState.isMonitoring ? 1 : 0.4)
+            .animation(.easeInOut(duration: 0.6), value: appState.isMonitoring)
+    }
 
-            Circle()
-                .fill(DesignTokens.Palette.surfaceRaised)
-                .frame(width: 120, height: 120)
-                .overlay(Circle().strokeBorder(DesignTokens.Palette.accent.opacity(0.4), lineWidth: 1))
-
-            Image(systemName: appState.isMonitoring ? "waveform" : "ear")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(DesignTokens.Palette.accent)
-                .symbolEffect(.variableColor, isActive: appState.isMonitoring)
-        }
-        .frame(height: 300)
-        .accessibilityHidden(true)
+    /// Which motion state the mark shows: narrating while a story plays,
+    /// otherwise the calm listening breath.
+    private var markState: ProximityMark.State {
+        proximityEngine.activeAlert != nil ? .narrating : .listening
     }
 
     // MARK: - Status
