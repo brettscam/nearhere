@@ -1,0 +1,169 @@
+/* Nearhere Design System v1.0 — "contour lines and campfire light."
+   Ported from the iOS DesignTokens. Dark is primary; light inverts neutrals only. */
+
+/* ---- Fonts (bundled OFL, self-hosted; no CDN) ---- */
+@font-face {
+  font-family: "Newsreader";
+  src: url("/fonts/Newsreader.ttf") format("truetype");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("/fonts/HankenGrotesk.ttf") format("truetype");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/SpaceMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/SpaceMono-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---- Tokens ---- */
+:root {
+  /* brand & signal (hue holds across themes) */
+  --amber: #ce7b2c;
+  --gold: #d9a62c;
+  --spruce: #2e4a3c;
+  --ember: #db6a40;
+  --basalt: #1b1c18;
+  --sand: #f4eee1;
+  --on-accent: #231a0e;
+
+  /* neutrals scale */
+  --n-900: #1b1c18;
+  --n-800: #24261f;
+  --n-700: #30322a;
+  --n-600: #3b3d33;
+  --n-500: #5a5748;
+  --n-400: #8b8676;
+  --n-300: #b4ae9e;
+  --n-200: #ded6c4;
+  --n-100: #f4eee1;
+  --n-050: #fbf7ec;
+
+  /* radius / spacing */
+  --r-chip: 6px;
+  --r-input: 10px;
+  --r-button: 14px;
+  --r-card: 20px;
+  --r-sheet: 28px;
+  --sp-xs: 4px;
+  --sp-sm: 8px;
+  --sp-row: 12px;
+  --sp-md: 16px;
+  --sp-card: 20px;
+  --sp-lg: 24px;
+  --sp-xl: 32px;
+
+  /* semantic — default (light) */
+  --bg: var(--n-100);
+  --surface: var(--n-050);
+  --surface-raised: #fffdf6;
+  --text-1: #23241e;
+  --text-2: #5a5748;
+  --text-3: #8b8676;
+  --hairline: rgba(35, 36, 30, 0.1);
+  --shadow: 0 10px 32px -12px rgba(28, 26, 14, 0.28);
+  --accent-text: #a6552f;
+}
+
+/* dark by OS pref */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: var(--n-900);
+    --surface: var(--n-800);
+    --surface-raised: var(--n-700);
+    --text-1: #f2ede1;
+    --text-2: #b4ae9e;
+    --text-3: #7c7a6e;
+    --hairline: rgba(242, 237, 225, 0.08);
+    --shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.5);
+    --accent-text: #d08a5e;
+  }
+}
+/* explicit toggles win over the media query */
+:root[data-theme="light"] {
+  --bg: var(--n-100);
+  --surface: var(--n-050);
+  --surface-raised: #fffdf6;
+  --text-1: #23241e;
+  --text-2: #5a5748;
+  --text-3: #8b8676;
+  --hairline: rgba(35, 36, 30, 0.1);
+  --shadow: 0 10px 32px -12px rgba(28, 26, 14, 0.28);
+  --accent-text: #a6552f;
+}
+:root[data-theme="dark"] {
+  --bg: var(--n-900);
+  --surface: var(--n-800);
+  --surface-raised: var(--n-700);
+  --text-1: #f2ede1;
+  --text-2: #b4ae9e;
+  --text-3: #7c7a6e;
+  --hairline: rgba(242, 237, 225, 0.08);
+  --shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.5);
+  --accent-text: #d08a5e;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* utility type roles */
+.eyebrow {
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.mono {
+  font-family: "Space Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.serif {
+  font-family: "Newsreader", Georgia, serif;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

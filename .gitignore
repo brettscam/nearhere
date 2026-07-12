@@ -36,6 +36,16 @@ Nearhere/Config/Secrets.plist
 .DS_Store
 *.swp
 
+# Web app (Next.js / Node)
+node_modules/
+.next/
+out/
+next-env.d.ts
+.vercel
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+
 # Fastlane
 fastlane/report.xml
 fastlane/Preview.html

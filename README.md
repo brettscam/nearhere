@@ -3,9 +3,34 @@
 An iOS app that narrates the world as you drive — surfacing nearby history, geology,
 Indigenous heritage, ecology, folklore, and more, using your location and an AI tour guide.
 
-> **Status:** Scaffold. Core architecture, models, services, and placeholder views are in
-> place. Final visual design (Claude design comps) will be layered onto the existing
-> `DesignTokens` system without restructuring the views.
+> **Status:** Two front-ends share one design system and architecture:
+> - **`/` (Next.js web app)** — the shippable, browser-runnable version deployed on Vercel.
+>   Build/run it now; iterate on product here.
+> - **`Nearhere/` (SwiftUI iOS app)** — the native scaffold to be compiled in Xcode on a
+>   Mac (this Linux env can't build iOS). Same tokens, models, and services, Swift-side.
+
+## Web app (Next.js)
+
+The web version runs in any browser and deploys to Vercel with zero config (it's at the
+repo root, so Vercel auto-detects Next.js).
+
+```bash
+npm install
+npm run dev        # http://localhost:3000
+```
+
+- Browser **Geolocation** → OSM **Nominatim** reverse geocode → **Overpass** nearby features
+  → the closest significant one surfaces as a POI card.
+- **"Tell me more"** calls `/api/narrate` (an edge route that proxies the Claude API,
+  key held server-side) and speaks the result with the **Web Speech API**.
+- Set `ANTHROPIC_API_KEY` in Vercel → Settings → Environment Variables for real narration;
+  without it the route returns a friendly placeholder so the UI still works end-to-end.
+- Design system ported 1:1 in `app/globals.css` (same fonts, palette, category colors) with
+  the breathing `ProximityMark` in `components/`.
+
+---
+
+## iOS app (SwiftUI)
 
 ## Requirements
 
