@@ -150,6 +150,12 @@ body {
   font-family: "Newsreader", Georgia, serif;
 }
 
+a,
+a:link,
+a:visited {
+  color: inherit;
+  text-decoration: none;
+}
 button {
   font-family: inherit;
   cursor: pointer;

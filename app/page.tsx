@@ -1,118 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useApp } from "@/lib/store";
+import { ThemeToggle, iconBtn } from "@/components/ui/kit";
+import BottomNav from "@/components/ui/BottomNav";
 import ProximityMark, { MarkState } from "@/components/ProximityMark";
 import POICard from "@/components/POICard";
-import { CATEGORY, categoryForFeature } from "@/lib/categories";
-import {
-  nearbyFeatures,
-  reverseGeocode,
-  detectionRadiusMeters,
-  metersToMilesString,
-} from "@/lib/geo";
-import type { POI, GeoContext, Narration } from "@/lib/types";
-
-type Status = "welcome" | "locating" | "listening" | "error";
 
 export default function Home() {
-  const [status, setStatus] = useState<Status>("welcome");
-  const [ctx, setCtx] = useState<GeoContext | null>(null);
-  const [poi, setPoi] = useState<POI | null>(null);
-  const [foundCount, setFoundCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [demoMode, setDemoMode] = useState(false);
+  const router = useRouter();
+  const {
+    homeStatus,
+    geoContext,
+    nearbyPoi,
+    demoMode,
+    startListening,
+    nowPlaying,
+    progress,
+    isPlaying,
+    playStory,
+    toggleBookmark,
+    isBookmarked,
+  } = useApp();
 
   const markState: MarkState =
-    status === "welcome" ? "idle" : playing ? "narrating" : status === "locating" ? "digging" : "listening";
-
-  // --- Core flow: locate → context → nearby → surface the top POI ---
-  const scan = useCallback(async (lat: number, lon: number) => {
-    setStatus("locating");
-    const context = await reverseGeocode(lat, lon);
-    setCtx(context);
-    try {
-      const feats = await nearbyFeatures(lat, lon, detectionRadiusMeters(0));
-      setFoundCount(feats.length);
-      const top = feats.find((f) => f.name) ?? feats[0];
-      if (top) {
-        setPoi({
-          id: top.id,
-          name: top.name ?? "A nearby place",
-          lat: top.lat,
-          lon: top.lon,
-          distance: top.distance ?? 0,
-          category: categoryForFeature(top),
-          feature: top,
-        });
-      } else {
-        setPoi(null);
-      }
-      setStatus("listening");
-    } catch (e: any) {
-      setError("Couldn't reach the map database. Try again in a moment.");
-      setStatus("error");
-    }
-  }, []);
-
-  const start = useCallback(() => {
-    setError(null);
-    if (!("geolocation" in navigator)) {
-      setError("This browser can't share location.");
-      setStatus("error");
-      return;
-    }
-    setStatus("locating");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => scan(pos.coords.latitude, pos.coords.longitude),
-      () => {
-        // Fall back to a scenic demo location (Mono Lake, CA).
-        setDemoMode(true);
-        scan(38.0169, -119.0269);
-      },
-      { enableHighAccuracy: true, timeout: 12000 },
-    );
-  }, [scan]);
-
-  const tellMeMore = useCallback(async () => {
-    if (!poi) return;
-    setPlaying(true);
-    setProgress(0.05);
-    try {
-      const res = await fetch("/api/narrate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lat: poi.lat,
-          lon: poi.lon,
-          region: ctx?.summary,
-          features: [poi.name, ...Object.entries(poi.feature.tags).slice(0, 3).map(([k, v]) => `${k}=${v}`)],
-          type: "deep_dive",
-        }),
-      });
-      const data = await res.json();
-      const narration: Narration = data.narration;
-      setPoi((p) => (p ? { ...p, narration } : p));
-      speak(narration.narration, setProgress, () => {
-        setPlaying(false);
-        setProgress(1);
-      });
-    } catch {
-      setPlaying(false);
-    }
-  }, [poi, ctx]);
+    nowPlaying && isPlaying
+      ? "narrating"
+      : homeStatus === "locating"
+        ? "digging"
+        : homeStatus === "welcome"
+          ? "idle"
+          : "listening";
 
   const statusText =
-    status === "welcome"
+    homeStatus === "welcome"
       ? "Tap start and Nearhere will listen for stories around you."
-      : status === "locating"
+      : homeStatus === "locating"
         ? "Finding your place in the world…"
-        : status === "error"
-          ? error ?? "Something went wrong."
-          : poi
-            ? `${foundCount} stories nearby — here's the closest.`
-            : "All quiet here. Try moving somewhere with more history.";
+        : homeStatus === "error"
+          ? "Couldn't reach the map database. Try again."
+          : "Quietly scanning the road ahead. We'll speak up when something's worth it.";
+
+  const isWelcome = homeStatus === "welcome";
+  const showCard = !!nearbyPoi && homeStatus === "listening";
+  const nearbyBookmarked = nearbyPoi ? isBookmarked(nearbyPoi.id) : false;
 
   return (
     <main className="wrap">
@@ -120,45 +51,122 @@ export default function Home() {
 
       <header className="top">
         <div>
-          <div className="eyebrow" style={{ color: "var(--text-3)", letterSpacing: "0.24em" }}>
-            {status === "welcome" ? "Nearhere" : "You're near"}
+          <div className="eyebrow" style={{ color: "var(--text-3)", letterSpacing: "0.22em" }}>
+            You're driving through
           </div>
-          <div className="region">{ctx?.summary ?? "Nearhere"}</div>
+          <div className="serif region">{geoContext?.summary ?? "Nearhere"}</div>
         </div>
         <ThemeToggle />
       </header>
 
       <section className="center">
-        <ProximityMark state={markState} size={230} />
+        <ProximityMark state={markState} size={220} />
+
+        {homeStatus === "listening" ? (
+          <span className="pill">
+            <span className="dot" />
+            <span className="mono">Listening</span>
+          </span>
+        ) : isWelcome ? (
+          <span className="pill pill-quiet">
+            <span className="mono">Tap to begin</span>
+          </span>
+        ) : null}
+
         <p className="status" aria-live="polite">
           {statusText}
         </p>
-        {demoMode && <p className="demo mono">demo location · Mono Lake, CA</p>}
+
+        {demoMode && <p className="mono demo">demo location · Mono Lake, CA</p>}
       </section>
 
       <footer className="bottom">
-        {poi && status === "listening" ? (
-          <POICard
-            poi={poi}
-            playing={playing}
-            progress={progress}
-            onTellMeMore={tellMeMore}
-            onDismiss={() => setPoi(null)}
-          />
-        ) : (
-          <button className="start" onClick={start} disabled={status === "locating"}>
-            {status === "locating" ? "Locating…" : status === "listening" ? "Rescan" : "Start listening"}
-          </button>
-        )}
+        <button
+          className="primary"
+          onClick={isWelcome ? startListening : () => router.push("/trips")}
+          disabled={homeStatus === "locating"}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 11l19-9-9 19-2-8-8-2z" />
+          </svg>
+          {isWelcome ? "Start listening" : "Start a trip"}
+        </button>
+
+        <button
+          className="bookmark"
+          onClick={() => nearbyPoi && toggleBookmark(nearbyPoi.id)}
+          aria-label={nearbyBookmarked ? "Remove bookmark" : "Bookmark"}
+          style={{
+            ...iconBtn,
+            width: 56,
+            height: 56,
+            borderRadius: "var(--r-button)",
+            color: nearbyBookmarked ? "var(--gold)" : "var(--text-2)",
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill={nearbyBookmarked ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 3h12v18l-6-4-6 4z" />
+          </svg>
+        </button>
       </footer>
+
+      {showCard && nearbyPoi && (
+        <div className="overlay">
+          <POICard
+            poi={nearbyPoi}
+            playing={isPlaying}
+            progress={progress}
+            isBookmarked={isBookmarked(nearbyPoi.id)}
+            onTellMeMore={() =>
+              playStory({
+                id: nearbyPoi.id,
+                title: nearbyPoi.name,
+                category: nearbyPoi.category,
+                duration: "2:00",
+                milesAhead: 0,
+                status: "playing",
+                routeT: 0,
+                lat: nearbyPoi.lat,
+                lon: nearbyPoi.lon,
+              })
+            }
+            onDismiss={() => {}}
+            onBookmark={() => toggleBookmark(nearbyPoi.id)}
+          />
+        </div>
+      )}
+
+      <BottomNav />
 
       <style jsx>{`
         .wrap {
           position: relative;
+          width: 100%;
+          max-width: 480px;
+          margin: 0 auto;
           min-height: 100dvh;
           display: flex;
           flex-direction: column;
-          padding: max(24px, env(safe-area-inset-top)) 24px 32px;
+          padding: max(24px, env(safe-area-inset-top)) 24px 96px;
           overflow: hidden;
         }
         .top {
@@ -170,12 +178,13 @@ export default function Home() {
           gap: 16px;
         }
         .region {
-          font-family: "Hanken Grotesk", sans-serif;
-          font-weight: 600;
+          font-weight: 500;
           font-size: 22px;
+          letter-spacing: -0.01em;
           color: var(--text-1);
-          margin-top: 2px;
+          margin-top: 4px;
           max-width: 70vw;
+          text-wrap: balance;
         }
         .center {
           position: relative;
@@ -185,8 +194,48 @@ export default function Home() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 20px;
+          gap: 18px;
           text-align: center;
+        }
+        .pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 14px;
+          border-radius: 999px;
+          background: var(--surface);
+          border: 1px solid var(--hairline);
+        }
+        .pill .mono {
+          font-size: 12px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--text-2);
+        }
+        .pill-quiet .mono {
+          color: var(--text-3);
+        }
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: #3fb27f;
+          box-shadow: 0 0 0 0 rgba(63, 178, 127, 0.5);
+          animation: breathe 2.4s ease-in-out infinite;
+        }
+        @keyframes breathe {
+          0%,
+          100% {
+            box-shadow: 0 0 0 0 rgba(63, 178, 127, 0.45);
+          }
+          50% {
+            box-shadow: 0 0 0 5px rgba(63, 178, 127, 0);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .dot {
+            animation: none;
+          }
         }
         .status {
           font-family: "Hanken Grotesk", sans-serif;
@@ -198,6 +247,7 @@ export default function Home() {
         }
         .demo {
           font-size: 12px;
+          letter-spacing: 0.04em;
           color: var(--text-3);
           margin: 0;
         }
@@ -205,11 +255,16 @@ export default function Home() {
           position: relative;
           z-index: 2;
           display: flex;
-          justify-content: center;
+          align-items: stretch;
+          gap: 12px;
         }
-        .start {
-          width: min(440px, 92vw);
+        .primary {
+          flex: 1;
           height: 56px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
           border: none;
           border-radius: var(--r-button);
           background: var(--amber);
@@ -217,52 +272,67 @@ export default function Home() {
           font-family: "Hanken Grotesk", sans-serif;
           font-weight: 700;
           font-size: 17px;
+          cursor: pointer;
           transition: opacity 0.2s;
         }
-        .start:disabled {
+        .primary:disabled {
           opacity: 0.7;
+          cursor: default;
+        }
+        .bookmark {
+          padding: 0;
+        }
+        .overlay {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: calc(78px + env(safe-area-inset-bottom));
+          z-index: 45;
+          display: flex;
+          justify-content: center;
+          padding: 0 16px;
+          pointer-events: none;
+          animation: springup 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.15);
+        }
+        .overlay :global(.card) {
+          pointer-events: auto;
+        }
+        @keyframes springup {
+          from {
+            transform: translateY(60px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .overlay {
+            animation: none;
+          }
         }
       `}</style>
     </main>
   );
 }
 
-// --- Web Speech narration ---
-function speak(text: string, onProgress: (p: number) => void, onEnd: () => void) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    // No TTS: reveal text, fake a progress sweep.
-    let p = 0;
-    const iv = setInterval(() => {
-      p += 0.05;
-      onProgress(Math.min(p, 1));
-      if (p >= 1) {
-        clearInterval(iv);
-        onEnd();
-      }
-    }, 300);
-    return;
-  }
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1;
-  u.pitch = 1;
-  const total = Math.max(text.length, 1);
-  u.onboundary = (e) => onProgress(Math.min(e.charIndex / total, 1));
-  u.onend = () => onEnd();
-  window.speechSynthesis.speak(u);
-}
-
-// --- Faint topographic contour background ---
+/* ---------- Faint topographic contour background ---------- */
 function Contours() {
   return (
-    <svg className="contours" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <g fill="none" stroke="var(--text-3)" strokeWidth="1" opacity="0.14">
-        {Array.from({ length: 9 }).map((_, i) => {
-          const y = 90 + i * 78;
+    <svg
+      className="contours"
+      viewBox="0 0 400 800"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <g fill="none" stroke="var(--text-3)" strokeWidth="1" opacity="0.12">
+        {Array.from({ length: 10 }).map((_, i) => {
+          const y = 70 + i * 76;
           return (
             <path
               key={i}
-              d={`M-20 ${y} C 80 ${y - 34}, 150 ${y + 20}, 220 ${y - 10} S 380 ${y - 40}, 420 ${y - 6}`}
+              d={`M-20 ${y} C 80 ${y - 36}, 150 ${y + 22}, 220 ${y - 12} S 380 ${y - 42}, 420 ${y - 6}`}
             />
           );
         })}
@@ -274,52 +344,9 @@ function Contours() {
           width: 100%;
           height: 100%;
           z-index: 1;
+          pointer-events: none;
         }
       `}</style>
     </svg>
-  );
-}
-
-function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
-  useEffect(() => {
-    const stored = (localStorage.getItem("nh-theme") as "light" | "dark" | null) ?? null;
-    if (stored) {
-      document.documentElement.setAttribute("data-theme", stored);
-      setTheme(stored);
-    }
-  }, []);
-  const toggle = () => {
-    const next =
-      (theme ??
-        (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark"
-        ? "light"
-        : "dark";
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("nh-theme", next);
-    setTheme(next);
-  };
-  return (
-    <button
-      onClick={toggle}
-      aria-label="Toggle theme"
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 999,
-        border: "1px solid var(--hairline)",
-        background: "var(--surface)",
-        color: "var(--text-2)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flex: "none",
-      }}
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" />
-      </svg>
-    </button>
   );
 }
