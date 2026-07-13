@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { GeoContext, POI, Preferences, Story, Trip } from "./types";
 import { SEED_TRIPS, ACTIVE_TRIP_ID, findTrip } from "./seed";
 import { nearbyFeatures, reverseGeocode, detectionRadiusMeters } from "./geo";
 import { categoryForFeature } from "./categories";
+import { ensureVoices, pickVoice, primeVoices } from "./voice";
 
 const DEFAULT_PREFS: Preferences = {
   enabledCategories: ["geology", "history", "indigenous", "ecology"],
@@ -25,6 +26,7 @@ interface AppValue {
   setFrequency: (f: Preferences["frequency"]) => void;
   toggleQuietHours: () => void;
   toggleSolo: () => void;
+  setVoice: (name: string) => void;
 
   // trips
   trips: Trip[];
@@ -80,6 +82,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Preferred TTS voice name (kept in a ref so the speak callback always sees
+  // the latest without re-creating). Empty string = auto-pick the best voice.
+  const voiceNameRef = useRef<string>("");
+  useEffect(() => {
+    primeVoices();
+  }, []);
+
   // --- preferences ---
   const toggleCategory = useCallback((c: Story["category"]) => {
     setPrefs((p) => {
@@ -91,6 +100,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setFrequency = useCallback((f: Preferences["frequency"]) => setPrefs((p) => ({ ...p, frequency: f })), []);
   const toggleQuietHours = useCallback(() => setPrefs((p) => ({ ...p, quietHours: !p.quietHours })), []);
   const toggleSolo = useCallback(() => setPrefs((p) => ({ ...p, soloMode: !p.soloMode })), []);
+  const setVoice = useCallback((name: string) => {
+    voiceNameRef.current = name;
+    setPrefs((p) => ({ ...p, voice: name }));
+  }, []);
 
   // --- trips ---
   const activeTrip = useMemo(() => (activeTripId ? findTrip(activeTripId) ?? null : null), [activeTripId]);
@@ -131,7 +144,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setProgress(1);
       };
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        await ensureVoices();
         const u = new SpeechSynthesisUtterance(text);
+        const voice = pickVoice(voiceNameRef.current);
+        if (voice) {
+          u.voice = voice;
+          u.lang = voice.lang;
+        }
+        // Warm, unhurried read — a well-traveled friend, not a GPS.
+        u.rate = 0.96;
+        u.pitch = 1.02;
         const total = Math.max(text.length, 1);
         u.onboundary = (e) => setProgress(Math.min(e.charIndex / total, 1));
         u.onend = finish;
@@ -225,7 +247,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value: AppValue = {
-    prefs, toggleCategory, setDensity, setFrequency, toggleQuietHours, toggleSolo,
+    prefs, toggleCategory, setDensity, setFrequency, toggleQuietHours, toggleSolo, setVoice,
     trips, activeTrip, startTrip, endTrip, queue,
     nowPlaying, progress, isPlaying, playStory, togglePlay, skip,
     bookmarks, toggleBookmark, isBookmarked,

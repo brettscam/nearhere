@@ -1,9 +1,78 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store";
 import { Segmented, Toggle, Eyebrow, PageTitle } from "@/components/ui/kit";
 import BottomNav from "@/components/ui/BottomNav";
+import { ensureVoices, rankedEnglishVoices } from "@/lib/voice";
+
+/* ---------- voice picker ---------- */
+function VoicePicker({ current, onPick }: { current: string; onPick: (name: string) => void }) {
+  const [voices, setVoices] = useState<{ name: string; label: string }[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    ensureVoices().then(() => {
+      if (!alive) return;
+      const ranked = rankedEnglishVoices();
+      setVoices(
+        ranked.map((v) => ({
+          name: v.name,
+          label: v.name.replace(/\(.*?\)/g, "").trim() + (v.localService === false ? " · online" : ""),
+        })),
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function preview(name: string) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance("Just ahead, the granite remembers the glacier.");
+    const v = window.speechSynthesis.getVoices().find((x) => x.name === name);
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang;
+    }
+    u.rate = 0.96;
+    u.pitch = 1.02;
+    window.speechSynthesis.speak(u);
+  }
+
+  const value = voices.some((v) => v.name === current) ? current : "";
+
+  return (
+    <select
+      aria-label="Narrator voice"
+      value={value}
+      onChange={(e) => {
+        onPick(e.target.value);
+        if (e.target.value) preview(e.target.value);
+      }}
+      style={{
+        maxWidth: 180,
+        background: "var(--surface-raised)",
+        color: "var(--text-1)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 10,
+        padding: "8px 10px",
+        fontFamily: "'Hanken Grotesk', sans-serif",
+        fontSize: 14,
+        flex: "none",
+      }}
+    >
+      <option value="">Auto (best)</option>
+      {voices.map((v) => (
+        <option key={v.name} value={v.name}>
+          {v.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 /* ---------- shared bits ---------- */
 const cardStyle: React.CSSProperties = {
@@ -57,7 +126,7 @@ function SettingRow({
 }
 
 export default function SettingsPage() {
-  const { prefs, setFrequency, toggleQuietHours, toggleSolo } = useApp();
+  const { prefs, setFrequency, toggleQuietHours, toggleSolo, setVoice } = useApp();
   const router = useRouter();
 
   return (
@@ -104,25 +173,8 @@ export default function SettingsPage() {
           <div style={{ height: 1, background: "var(--hairline)" }} />
           <SettingRow
             title="Voice"
-            sub="Warm narrator (default)"
-            control={
-              <span
-                className="mono"
-                aria-disabled="true"
-                style={{
-                  fontSize: 11,
-                  letterSpacing: "0.12em",
-                  color: "var(--text-3)",
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: "1px solid var(--hairline)",
-                  opacity: 0.7,
-                  flex: "none",
-                }}
-              >
-                SOON
-              </span>
-            }
+            sub="Pick the narrator — quality varies by device"
+            control={<VoicePicker current={prefs.voice} onPick={setVoice} />}
           />
         </div>
       </section>
