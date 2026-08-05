@@ -308,6 +308,56 @@ export async function overpassAlongRoute(points: { lat: number; lon: number }[],
   return [];
 }
 
+/** Categorize a Wikipedia article title by keywords (OSM has no tags for these). */
+function categorizeTitle(title: string): POICategory {
+  const t = title.toLowerCase();
+  if (/(nez perce|shoshone|paiute|lakota|tribe|indian|reservation|pueblo)/.test(t)) return "indigenous";
+  if (/(battle|fort|massacre|military|war|cavalry|skirmish)/.test(t)) return "military";
+  if (/(lewis|clark|expedition|trail|historic|pioneer|settlement|mission|ghost town|mine|mining)/.test(t)) return "history";
+  if (/(river|creek|lake|falls|forest|wildlife|refuge|marsh|wetland|spring)/.test(t)) return "ecology";
+  if (/(mountain|peak|pass|canyon|butte|volcano|crater|cave|geolog|rock|cliff|dome|hot spring)/.test(t)) return "geology";
+  if (/(observatory|telescope|astronom)/.test(t)) return "astronomy";
+  if (/(museum|theater|festival|art|cultural)/.test(t)) return "culture";
+  return "history";
+}
+
+/** Notable places near a point from Wikipedia geosearch — free, no key, and it
+ *  covers what OSM misses (historic trails, expeditions, named rivers, towns). */
+export async function wikipediaNearby(lat: number, lon: number, radiusMeters = 10000, limit = 20): Promise<NearbyFeature[]> {
+  try {
+    const r = Math.min(Math.round(radiusMeters), 10000); // API max is 10km
+    const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&list=geosearch&gscoord=${lat}%7C${lon}&gsradius=${r}&gslimit=${limit}`;
+    const res = await fetchWithTimeout(url, {}, 8000);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data?.query?.geosearch ?? []).map((g: any) => ({
+      id: `wiki/${g.pageid}`,
+      name: g.title,
+      category: categorizeTitle(g.title),
+      lat: g.lat,
+      lon: g.lon,
+      significance: 3.5, // having a Wikipedia article is a strong notability signal
+      tags: { wikipedia: g.title, source: "wikipedia" },
+    })) as NearbyFeature[];
+  } catch {
+    return [];
+  }
+}
+
+/** Merge + dedupe (by lowercased name) two feature lists, keeping the highest
+ *  significance, then rank. */
+export function mergeFeatures(...lists: NearbyFeature[][]): NearbyFeature[] {
+  const byName = new Map<string, NearbyFeature>();
+  for (const list of lists) {
+    for (const f of list) {
+      const key = f.name.toLowerCase();
+      const existing = byName.get(key);
+      if (!existing || f.significance > existing.significance) byName.set(key, f);
+    }
+  }
+  return [...byName.values()].sort((a, b) => b.significance - a.significance);
+}
+
 // --- geometry helpers ---
 export function fmtDuration(seconds: number): string {
   const min = Math.round(seconds / 60);

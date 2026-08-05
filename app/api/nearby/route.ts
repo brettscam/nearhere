@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { overpassNearby, reverse, METERS_PER_MILE } from "@/lib/osm";
+import { overpassNearby, wikipediaNearby, mergeFeatures, reverse, METERS_PER_MILE } from "@/lib/osm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,13 +12,17 @@ export async function GET(req: NextRequest) {
   if (Number.isNaN(lat) || Number.isNaN(lon)) {
     return NextResponse.json({ features: [], context: { summary: "Somewhere out there" } }, { status: 200 });
   }
-  // widen once if the immediate area is empty (rural roads)
+  // OSM + Wikipedia in parallel; widen once if the immediate area is empty.
   const radii = [radiusMiles, radiusMiles * 4];
-  let features: Awaited<ReturnType<typeof overpassNearby>> = [];
+  let osm: Awaited<ReturnType<typeof overpassNearby>> = [];
   for (const r of radii) {
-    features = await overpassNearby(lat, lon, r * METERS_PER_MILE, 40);
-    if (features.length) break;
+    osm = await overpassNearby(lat, lon, r * METERS_PER_MILE, 40);
+    if (osm.length) break;
   }
-  const context = await reverse(lat, lon);
+  const [wiki, context] = await Promise.all([
+    wikipediaNearby(lat, lon, Math.min(radiusMiles * METERS_PER_MILE, 10000), 20),
+    reverse(lat, lon),
+  ]);
+  const features = mergeFeatures(osm, wiki);
   return NextResponse.json({ features, context });
 }

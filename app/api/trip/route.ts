@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { geocode, osrmRoute, sampleRoute, overpassAlongRoute, haversineMiles, METERS_PER_MILE } from "@/lib/osm";
+import { geocode, osrmRoute, sampleRoute, overpassAlongRoute, wikipediaNearby, mergeFeatures, haversineMiles, METERS_PER_MILE } from "@/lib/osm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,7 +55,13 @@ async function build(rawFrom: string, rawTo: string, near?: { lat: number; lon: 
   const { distanceMiles, durationText, coordinates } = route;
   const interval = Math.min(30, Math.max(10, distanceMiles / 6));
   const samples = sampleRoute(coordinates, interval, 6);
-  const features = await overpassAlongRoute(samples, interval * 0.6 * METERS_PER_MILE, 80);
+  // Two sources in parallel: OSM (Overpass) for natural/POI features, and
+  // Wikipedia geosearch for notable/historic places OSM misses.
+  const [overpassFeatures, ...wikiLists] = await Promise.all([
+    overpassAlongRoute(samples, interval * 0.6 * METERS_PER_MILE, 80),
+    ...samples.map((p) => wikipediaNearby(p.lat, p.lon, 10000, 15)),
+  ]);
+  const features = mergeFeatures(overpassFeatures, wikiLists.flat());
 
   // position each feature along the route (0..1)
   const nearestT = (lat: number, lon: number): number => {
