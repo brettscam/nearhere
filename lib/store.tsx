@@ -3,8 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { GeoContext, POI, Preferences, Story, Trip } from "./types";
 import { SEED_TRIPS, ACTIVE_TRIP_ID, findTrip } from "./seed";
-import { nearbyFeatures, reverseGeocode, detectionRadiusMeters } from "./geo";
-import { categoryForFeature } from "./categories";
+import { distanceMeters } from "./geo";
 import { ensureVoices, pickVoice, primeVoices } from "./voice";
 
 const DEFAULT_PREFS: Preferences = {
@@ -32,6 +31,7 @@ interface AppValue {
   trips: Trip[];
   activeTrip: Trip | null;
   startTrip: (id: string) => void;
+  startCustomTrip: (trip: Trip) => void;
   endTrip: () => void;
 
   // queue derived from the active trip
@@ -70,6 +70,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFS);
   const [trips] = useState<Trip[]>(SEED_TRIPS);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  const [customTrip, setCustomTrip] = useState<Trip | null>(null);
   const [nowPlaying, setNowPlaying] = useState<Story | null>(null);
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -106,8 +107,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // --- trips ---
-  const activeTrip = useMemo(() => (activeTripId ? findTrip(activeTripId) ?? null : null), [activeTripId]);
+  const activeTrip = useMemo(() => {
+    if (customTrip && customTrip.id === activeTripId) return customTrip;
+    return activeTripId ? findTrip(activeTripId) ?? null : null;
+  }, [activeTripId, customTrip]);
   const startTrip = useCallback((id: string) => setActiveTripId(id), []);
+  const startCustomTrip = useCallback((t: Trip) => {
+    setCustomTrip(t);
+    setActiveTripId(t.id);
+  }, []);
   const endTrip = useCallback(() => setActiveTripId(null), []);
   const queue = useMemo(() => activeTrip?.stories ?? findTrip(ACTIVE_TRIP_ID)?.stories ?? [], [activeTrip]);
 
@@ -206,31 +214,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const isBookmarked = useCallback((id: string) => bookmarks.includes(id), [bookmarks]);
 
-  // --- live home flow ---
+  // --- live home flow (all OSM calls go through our own server) ---
+  const scan = useCallback(async (lat: number, lon: number) => {
+    try {
+      const res = await fetch(`/api/nearby?lat=${lat}&lon=${lon}&radius=6`);
+      const data = await res.json();
+      setGeoContext(data.context ?? { summary: "Nearhere" });
+      const top = data.features?.[0];
+      if (top) {
+        setNearbyPoi({
+          id: top.id,
+          name: top.name,
+          lat: top.lat,
+          lon: top.lon,
+          distance: distanceMeters({ lat, lon }, { lat: top.lat, lon: top.lon }),
+          category: top.category,
+        });
+      } else {
+        // Nothing catalogued nearby — narrate where you are instead.
+        const loc = data.context?.locality ?? data.context?.summary ?? "This stretch of road";
+        setNearbyPoi({ id: "here", name: loc, lat, lon, distance: 0, category: "history" });
+      }
+      setHomeStatus("listening");
+    } catch {
+      setHomeStatus("error");
+    }
+  }, []);
+
   const startListening = useCallback(() => {
     setHomeStatus("locating");
-    const scan = async (lat: number, lon: number) => {
-      const context = await reverseGeocode(lat, lon);
-      setGeoContext(context);
-      try {
-        const feats = await nearbyFeatures(lat, lon, detectionRadiusMeters(0));
-        const top = feats.find((f) => f.name) ?? feats[0];
-        if (top) {
-          setNearbyPoi({
-            id: top.id,
-            name: top.name ?? "A nearby place",
-            lat: top.lat,
-            lon: top.lon,
-            distance: top.distance ?? 0,
-            category: categoryForFeature(top),
-            feature: top,
-          });
-        }
-        setHomeStatus("listening");
-      } catch {
-        setHomeStatus("error");
-      }
-    };
     if (typeof navigator !== "undefined" && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => scan(pos.coords.latitude, pos.coords.longitude),
@@ -244,11 +256,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setDemoMode(true);
       scan(38.0169, -119.0269);
     }
-  }, []);
+  }, [scan]);
 
   const value: AppValue = {
     prefs, toggleCategory, setDensity, setFrequency, toggleQuietHours, toggleSolo, setVoice,
-    trips, activeTrip, startTrip, endTrip, queue,
+    trips, activeTrip, startTrip, startCustomTrip, endTrip, queue,
     nowPlaying, progress, isPlaying, playStory, togglePlay, skip,
     bookmarks, toggleBookmark, isBookmarked,
     homeStatus, geoContext, nearbyPoi, demoMode, startListening,
