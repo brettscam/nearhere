@@ -7,6 +7,10 @@ export const maxDuration = 30;
 
 const DURATIONS = ["2:10", "2:24", "2:38", "2:52", "3:05", "1:58"];
 
+export async function GET(req: NextRequest) {
+  return build(req.nextUrl.searchParams.get("from") ?? "", req.nextUrl.searchParams.get("to") ?? "");
+}
+
 export async function POST(req: NextRequest) {
   let body: { from?: string; to?: string };
   try {
@@ -14,8 +18,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
-  const fromQ = (body.from ?? "").trim();
-  const toQ = (body.to ?? "").trim();
+  return build(body.from ?? "", body.to ?? "");
+}
+
+async function build(rawFrom: string, rawTo: string) {
+  const fromQ = rawFrom.trim();
+  const toQ = rawTo.trim();
   if (!fromQ || !toQ) return NextResponse.json({ error: "Enter both a start and destination." }, { status: 400 });
 
   const [fromHits, toHits] = await Promise.all([geocode(fromQ, 1), geocode(toQ, 1)]);
