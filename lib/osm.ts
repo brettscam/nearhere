@@ -159,7 +159,7 @@ function significance(tags: Record<string, string>, hasName: boolean): number {
 export async function overpassNearby(lat: number, lon: number, radiusMeters: number, limit = 40): Promise<NearbyFeature[]> {
   const r = Math.round(radiusMeters);
   const q =
-    `[out:json][timeout:25];(` +
+    `[out:json][timeout:14];(` +
     `node["historic"](around:${r},${lat},${lon});` +
     `node["tourism"~"attraction|museum|artwork|viewpoint|gallery"](around:${r},${lat},${lon});` +
     `node["natural"~"peak|volcano|waterfall|hot_spring|spring|cliff|cave_entrance"](around:${r},${lat},${lon});` +
@@ -178,7 +178,7 @@ export async function overpassNearby(lat: number, lon: number, radiusMeters: num
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "data=" + encodeURIComponent(q),
-      }, 25000);
+      }, 15000);
       if (!res.ok) continue;
       const data = await res.json();
       const feats: NearbyFeature[] = (data.elements ?? [])
@@ -244,12 +244,11 @@ export async function overpassAlongRoute(points: { lat: number; lon: number }[],
     .map(
       (p) =>
         `node["historic"]["name"](around:${r},${p.lat},${p.lon});` +
-        `node["tourism"~"attraction|museum|artwork|viewpoint"]["name"](around:${r},${p.lat},${p.lon});` +
-        `node["natural"~"peak|volcano|waterfall|hot_spring|spring|cliff"]["name"](around:${r},${p.lat},${p.lon});` +
-        `node["geological"]["name"](around:${r},${p.lat},${p.lon});`,
+        `node["tourism"~"attraction|museum|viewpoint"]["name"](around:${r},${p.lat},${p.lon});` +
+        `node["natural"~"peak|volcano|waterfall|hot_spring"]["name"](around:${r},${p.lat},${p.lon});`,
     )
     .join("");
-  const q = `[out:json][timeout:25];(${clauses});out center 200;`;
+  const q = `[out:json][timeout:18];(${clauses});out center 150;`;
 
   const endpoints = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
   for (const ep of endpoints) {
@@ -258,7 +257,7 @@ export async function overpassAlongRoute(points: { lat: number; lon: number }[],
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "data=" + encodeURIComponent(q),
-      }, 25000);
+      }, 15000);
       if (!res.ok) continue;
       const data = await res.json();
       const feats: NearbyFeature[] = (data.elements ?? [])

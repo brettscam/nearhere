@@ -3,7 +3,7 @@ import { geocode, osrmRoute, sampleRoute, overpassAlongRoute, haversineMiles, ME
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const DURATIONS = ["2:10", "2:24", "2:38", "2:52", "3:05", "1:58"];
 
@@ -36,9 +36,9 @@ async function build(rawFrom: string, rawTo: string) {
   if (!route) return NextResponse.json({ error: "Couldn't route between those places." }, { status: 422 });
 
   const { distanceMiles, durationText, coordinates } = route;
-  const interval = Math.min(25, Math.max(8, distanceMiles / 10));
-  const samples = sampleRoute(coordinates, interval, 12);
-  const features = await overpassAlongRoute(samples, interval * 0.7 * METERS_PER_MILE, 80);
+  const interval = Math.min(30, Math.max(10, distanceMiles / 6));
+  const samples = sampleRoute(coordinates, interval, 6);
+  const features = await overpassAlongRoute(samples, interval * 0.6 * METERS_PER_MILE, 80);
 
   // position each feature along the route (0..1)
   const nearestT = (lat: number, lon: number): number => {

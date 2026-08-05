@@ -3,7 +3,7 @@ import { overpassNearby, reverse, METERS_PER_MILE } from "@/lib/osm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 45;
 
 export async function GET(req: NextRequest) {
   const lat = parseFloat(req.nextUrl.searchParams.get("lat") ?? "");
@@ -12,8 +12,8 @@ export async function GET(req: NextRequest) {
   if (Number.isNaN(lat) || Number.isNaN(lon)) {
     return NextResponse.json({ features: [], context: { summary: "Somewhere out there" } }, { status: 200 });
   }
-  // widen the search if the immediate area is empty (rural roads)
-  const radii = [radiusMiles, radiusMiles * 2.5, radiusMiles * 6];
+  // widen once if the immediate area is empty (rural roads)
+  const radii = [radiusMiles, radiusMiles * 4];
   let features: Awaited<ReturnType<typeof overpassNearby>> = [];
   for (const r of radii) {
     features = await overpassNearby(lat, lon, r * METERS_PER_MILE, 40);
