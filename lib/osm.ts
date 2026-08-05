@@ -145,13 +145,24 @@ function categorize(tags: Record<string, string>): POICategory {
 }
 
 function significance(tags: Record<string, string>, hasName: boolean): number {
-  let s = hasName ? 2 : 0;
-  if (tags.wikipedia || tags.wikidata) s += 2.5;
+  let s = hasName ? 1.5 : 0;
+  if (tags.wikipedia || tags.wikidata) s += 2;
   if (tags.heritage) s += 1;
-  if (tags.historic) s += 1.2;
-  if (tags.tourism === "attraction" || tags.tourism === "viewpoint") s += 1;
-  if (tags.natural === "peak" || tags.natural === "waterfall" || tags.geological) s += 1;
-  if (tags.tourism === "hotel" || tags.tourism === "camp_site" || tags.tourism === "information") s -= 1.5;
+  // experiences first — a famous waterfall should beat a nearby town
+  if (tags.tourism === "attraction") s += 2.5;
+  else if (tags.tourism === "viewpoint") s += 2;
+  else if (tags.tourism === "museum") s += 1.6;
+  if (tags.natural === "waterfall") s += 3;
+  else if (tags.natural === "hot_spring") s += 2.2;
+  else if (tags.natural === "volcano") s += 2;
+  else if (tags.natural === "peak") s += 1.2;
+  if (tags.geological) s += 1.6;
+  if (tags.historic === "archaeological_site") s += 2;
+  else if (tags.historic === "monument" || tags.historic === "memorial") s += 1.8;
+  else if (tags.historic) s += 1.4;
+  // towns/villages are context, not the headline
+  if (tags.place) s -= 0.6;
+  if (tags.tourism === "hotel" || tags.tourism === "camp_site" || tags.tourism === "information") s -= 2;
   return s;
 }
 
