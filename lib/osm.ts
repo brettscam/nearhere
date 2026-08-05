@@ -44,7 +44,12 @@ function shortName(display?: string): string {
   return display.split(",").slice(0, 2).join(",").trim();
 }
 
-export async function geocode(query: string, limit = 5, near?: { lat: number; lon: number }): Promise<Place[]> {
+export async function geocode(
+  query: string,
+  limit = 5,
+  near?: { lat: number; lon: number },
+  opts?: { bounded?: boolean; box?: number },
+): Promise<Place[]> {
   const q = query.trim();
   if (!q) return [];
   const coord = coordFromString(q);
@@ -52,10 +57,12 @@ export async function geocode(query: string, limit = 5, near?: { lat: number; lo
   try {
     let url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=${limit}&addressdetails=1&countrycodes=us,ca,mx&q=${encodeURIComponent(q)}`;
     if (near && Number.isFinite(near.lat) && Number.isFinite(near.lon)) {
-      // Prioritize (not restrict) results near the traveler so ambiguous names
-      // like "Salmon River" / "Hamilton" resolve locally, not across the country.
-      const d = 4;
+      // Bias (viewbox) or restrict (bounded) results to near the traveler so
+      // ambiguous names like "Salmon River" / "Hamilton" resolve locally — a
+      // major city (Hamilton, Ontario) otherwise wins on raw importance.
+      const d = opts?.box ?? 4;
       url += `&viewbox=${near.lon - d},${near.lat + d},${near.lon + d},${near.lat - d}`;
+      if (opts?.bounded) url += `&bounded=1`;
     }
     const res = await fetchWithTimeout(url);
     if (!res.ok) return [];

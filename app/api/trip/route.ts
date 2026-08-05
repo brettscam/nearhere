@@ -35,13 +35,18 @@ async function build(rawFrom: string, rawTo: string, near?: { lat: number; lon: 
   const toQ = rawTo.trim();
   if (!fromQ || !toQ) return NextResponse.json({ error: "Enter both a start and destination." }, { status: 400 });
 
-  // Bias the origin toward the traveler; bias the destination toward the origin.
-  const fromHits = await geocode(fromQ, 1, near);
-  const originNear = fromHits[0] ? { lat: fromHits[0].lat, lon: fromHits[0].lon } : near;
-  const toHits = await geocode(toQ, 1, originNear);
+  // Origin: prefer results near the traveler (bounded if we have their GPS).
+  let fromHits = near ? await geocode(fromQ, 1, near, { bounded: true, box: 6 }) : [];
+  if (!fromHits.length) fromHits = await geocode(fromQ, 1, near, { box: 6 });
   const a = fromHits[0];
-  const b = toHits[0];
   if (!a) return NextResponse.json({ error: `Couldn't find "${fromQ}". Try adding the state.` }, { status: 422 });
+
+  // Destination: restrict to a box around the origin first (kills Hamilton, ON
+  // when you mean Hamilton, MT), then fall back to unbounded for far trips.
+  const originNear = { lat: a.lat, lon: a.lon };
+  let toHits = await geocode(toQ, 1, originNear, { bounded: true, box: 6 });
+  if (!toHits.length) toHits = await geocode(toQ, 1, originNear, { box: 6 });
+  const b = toHits[0];
   if (!b) return NextResponse.json({ error: `Couldn't find "${toQ}". Try adding the state.` }, { status: 422 });
 
   const route = await osrmRoute(a, b);
