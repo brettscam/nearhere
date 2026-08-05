@@ -77,25 +77,37 @@ async function build(rawFrom: string, rawTo: string, near?: { lat: number; lon: 
     return coordinates.length > 1 ? bestI / (coordinates.length - 1) : 0;
   };
 
-  const targetCount = Math.min(40, Math.max(6, Math.round(distanceMiles / 8)));
-  const top = features.slice(0, targetCount);
+  const targetCount = Math.min(40, Math.max(8, Math.round(distanceMiles / 8)));
 
-  const stories = top
-    .map((f, i) => ({
-      id: f.id,
-      title: f.name,
-      category: f.category,
-      duration: DURATIONS[i % DURATIONS.length],
-      routeT: nearestT(f.lat, f.lon),
-      lat: f.lat,
-      lon: f.lon,
-    }))
-    .sort((x, y) => x.routeT - y.routeT)
-    .map((s, i) => ({
-      ...s,
-      milesAhead: Math.round(s.routeT * distanceMiles * 10) / 10,
-      status: i === 0 ? "playing" : "queued",
-    }));
+  // Position each feature along the route, then spread the picks across the
+  // whole route (bucket by position, take the best in each) so stories aren't
+  // all clustered in the first town.
+  const positioned = features.map((f) => ({ f, t: nearestT(f.lat, f.lon) }));
+  const segments = Math.min(targetCount, 14);
+  const buckets: { f: (typeof positioned)[number]["f"]; t: number }[][] = Array.from({ length: segments }, () => []);
+  for (const item of positioned) {
+    const idx = Math.min(segments - 1, Math.max(0, Math.floor(item.t * segments)));
+    buckets[idx].push(item);
+  }
+  const perBucket = Math.max(1, Math.ceil(targetCount / segments));
+  const picks: { f: (typeof positioned)[number]["f"]; t: number }[] = [];
+  for (const b of buckets) {
+    b.sort((x, y) => y.f.significance - x.f.significance);
+    picks.push(...b.slice(0, perBucket));
+  }
+  picks.sort((x, y) => x.t - y.t);
+
+  const stories = picks.slice(0, targetCount).map((item, i) => ({
+    id: item.f.id,
+    title: item.f.name,
+    category: item.f.category,
+    duration: DURATIONS[i % DURATIONS.length],
+    routeT: item.t,
+    lat: item.f.lat,
+    lon: item.f.lon,
+    milesAhead: Math.round(item.t * distanceMiles * 10) / 10,
+    status: i === 0 ? ("playing" as const) : ("queued" as const),
+  }));
 
   const trip = {
     id: `custom-${Date.now()}`,
