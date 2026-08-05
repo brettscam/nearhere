@@ -44,13 +44,19 @@ function shortName(display?: string): string {
   return display.split(",").slice(0, 2).join(",").trim();
 }
 
-export async function geocode(query: string, limit = 5): Promise<Place[]> {
+export async function geocode(query: string, limit = 5, near?: { lat: number; lon: number }): Promise<Place[]> {
   const q = query.trim();
   if (!q) return [];
   const coord = coordFromString(q);
   if (coord) return [coord];
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=${limit}&q=${encodeURIComponent(q)}`;
+    let url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=${limit}&addressdetails=1&countrycodes=us,ca,mx&q=${encodeURIComponent(q)}`;
+    if (near && Number.isFinite(near.lat) && Number.isFinite(near.lon)) {
+      // Prioritize (not restrict) results near the traveler so ambiguous names
+      // like "Salmon River" / "Hamilton" resolve locally, not across the country.
+      const d = 4;
+      url += `&viewbox=${near.lon - d},${near.lat + d},${near.lon + d},${near.lat - d}`;
+    }
     const res = await fetchWithTimeout(url);
     if (!res.ok) return [];
     const data = await res.json();
@@ -156,6 +162,8 @@ function significance(tags: Record<string, string>, hasName: boolean): number {
   else if (tags.natural === "hot_spring") s += 2.2;
   else if (tags.natural === "volcano") s += 2;
   else if (tags.natural === "peak") s += 1.2;
+  if (tags.waterway === "river") s += 1.4; // named rivers (Salmon, Snake…)
+  if (tags.tourism === "information") s += 0.4; // trail markers / interpretive boards
   if (tags.geological) s += 1.6;
   if (tags.historic === "archaeological_site") s += 2;
   else if (tags.historic === "monument" || tags.historic === "memorial") s += 1.8;
@@ -255,8 +263,10 @@ export async function overpassAlongRoute(points: { lat: number; lon: number }[],
     .map(
       (p) =>
         `node["historic"]["name"](around:${r},${p.lat},${p.lon});` +
-        `node["tourism"~"attraction|museum|viewpoint"]["name"](around:${r},${p.lat},${p.lon});` +
-        `node["natural"~"peak|volcano|waterfall|hot_spring"]["name"](around:${r},${p.lat},${p.lon});`,
+        `way["historic"]["name"](around:${r},${p.lat},${p.lon});` +
+        `node["tourism"~"attraction|museum|viewpoint|information"]["name"](around:${r},${p.lat},${p.lon});` +
+        `node["natural"~"peak|volcano|waterfall|hot_spring|spring"]["name"](around:${r},${p.lat},${p.lon});` +
+        `way["waterway"="river"]["name"](around:${r},${p.lat},${p.lon});`,
     )
     .join("");
   const q = `[out:json][timeout:18];(${clauses});out center 150;`;

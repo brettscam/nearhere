@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/lib/store";
@@ -22,6 +22,18 @@ export default function TripSetup() {
   const [error, setError] = useState<string | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [paste, setPaste] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Grab the traveler's location (silent if already granted) to disambiguate
+  // place names like "Salmon River" / "Hamilton" toward where they actually are.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => setCoords({ lat: p.coords.latitude, lon: p.coords.longitude }),
+      () => {},
+      { timeout: 8000, maximumAge: 300000 },
+    );
+  }, []);
 
   const density = prefs.density;
   const densityLabel = density < 0.33 ? "Selective" : density < 0.66 ? "Balanced" : "Everything";
@@ -37,7 +49,7 @@ export default function TripSetup() {
       const res = await fetch("/api/trip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to }),
+        body: JSON.stringify({ from, to, lat: coords?.lat, lon: coords?.lon }),
       });
       const data = await res.json();
       if (!res.ok) {

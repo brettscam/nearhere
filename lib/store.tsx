@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { GeoContext, POI, Preferences, Story, Trip } from "./types";
 import { SEED_TRIPS, ACTIVE_TRIP_ID, findTrip } from "./seed";
 import { distanceMeters } from "./geo";
-import { ensureVoices, pickVoice, primeVoices } from "./voice";
+import { pickVoice, primeVoices } from "./voice";
 
 const DEFAULT_PREFS: Preferences = {
   enabledCategories: ["geology", "history", "indigenous", "ecology"],
@@ -127,7 +127,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const playStory = useCallback(
     async (s: Story) => {
-      stopAudio();
+      const ss = typeof window !== "undefined" && "speechSynthesis" in window ? window.speechSynthesis : null;
+
+      // iOS unlock: speech MUST be kicked off inside the tap's user gesture.
+      // This runs synchronously (before any await) so the later narration is
+      // allowed to play. An empty priming utterance activates the engine.
+      if (ss) {
+        try {
+          ss.cancel();
+          ss.resume();
+          ss.speak(new SpeechSynthesisUtterance(" "));
+        } catch {
+          /* ignore */
+        }
+      }
+      if (progressTimer.current) clearInterval(progressTimer.current);
+
       setNowPlaying(s);
       setIsPlaying(true);
       setProgress(0);
@@ -151,21 +166,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(false);
         setProgress(1);
       };
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        await ensureVoices();
-        const u = new SpeechSynthesisUtterance(text);
+
+      if (ss) {
         const voice = pickVoice(voiceNameRef.current);
-        if (voice) {
-          u.voice = voice;
-          u.lang = voice.lang;
+        // iOS cuts long utterances, so speak sentence by sentence.
+        const sentences = text.match(/[^.!?]+[.!?]*\s*/g) ?? [text];
+        const totalLen = Math.max(text.length, 1);
+        let spoken = 0;
+        let i = 0;
+        const speakNext = () => {
+          if (i >= sentences.length) {
+            finish();
+            return;
+          }
+          const chunk = sentences[i++];
+          const u = new SpeechSynthesisUtterance(chunk);
+          if (voice) {
+            u.voice = voice;
+            u.lang = voice.lang;
+          }
+          u.rate = 0.98;
+          u.pitch = 1.02;
+          u.onend = () => {
+            spoken += chunk.length;
+            setProgress(Math.min(spoken / totalLen, 1));
+            speakNext();
+          };
+          u.onerror = () => {
+            spoken += chunk.length;
+            speakNext();
+          };
+          ss.speak(u);
+        };
+        try {
+          ss.resume();
+        } catch {
+          /* ignore */
         }
-        // Warm, unhurried read — a well-traveled friend, not a GPS.
-        u.rate = 0.96;
-        u.pitch = 1.02;
-        const total = Math.max(text.length, 1);
-        u.onboundary = (e) => setProgress(Math.min(e.charIndex / total, 1));
-        u.onend = finish;
-        window.speechSynthesis.speak(u);
+        speakNext();
       } else {
         // No TTS: sweep progress over ~a few seconds.
         let p = 0;

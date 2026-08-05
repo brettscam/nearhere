@@ -8,25 +8,37 @@ export const maxDuration = 60;
 const DURATIONS = ["2:10", "2:24", "2:38", "2:52", "3:05", "1:58"];
 
 export async function GET(req: NextRequest) {
-  return build(req.nextUrl.searchParams.get("from") ?? "", req.nextUrl.searchParams.get("to") ?? "");
+  const p = req.nextUrl.searchParams;
+  const near = coordFrom(p.get("lat"), p.get("lon"));
+  return build(p.get("from") ?? "", p.get("to") ?? "", near);
 }
 
 export async function POST(req: NextRequest) {
-  let body: { from?: string; to?: string };
+  let body: { from?: string; to?: string; lat?: number; lon?: number };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
-  return build(body.from ?? "", body.to ?? "");
+  const near = coordFrom(body.lat, body.lon);
+  return build(body.from ?? "", body.to ?? "", near);
 }
 
-async function build(rawFrom: string, rawTo: string) {
+function coordFrom(lat: unknown, lon: unknown): { lat: number; lon: number } | undefined {
+  const la = typeof lat === "string" ? parseFloat(lat) : (lat as number);
+  const lo = typeof lon === "string" ? parseFloat(lon) : (lon as number);
+  return Number.isFinite(la) && Number.isFinite(lo) ? { lat: la, lon: lo } : undefined;
+}
+
+async function build(rawFrom: string, rawTo: string, near?: { lat: number; lon: number }) {
   const fromQ = rawFrom.trim();
   const toQ = rawTo.trim();
   if (!fromQ || !toQ) return NextResponse.json({ error: "Enter both a start and destination." }, { status: 400 });
 
-  const [fromHits, toHits] = await Promise.all([geocode(fromQ, 1), geocode(toQ, 1)]);
+  // Bias the origin toward the traveler; bias the destination toward the origin.
+  const fromHits = await geocode(fromQ, 1, near);
+  const originNear = fromHits[0] ? { lat: fromHits[0].lat, lon: fromHits[0].lon } : near;
+  const toHits = await geocode(toQ, 1, originNear);
   const a = fromHits[0];
   const b = toHits[0];
   if (!a) return NextResponse.json({ error: `Couldn't find "${fromQ}". Try adding the state.` }, { status: 422 });
